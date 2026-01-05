@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Piano Finanziario 2025 - v31 (Fixed)</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        .budget-input {
+            width: 100%;
+            min-width: 80px;
+            padding: 4px 8px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            text-align: right;
+            transition: all 0.2s;
+            font-variant-numeric: tabular-nums;
+        }
+        .budget-input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+        .budget-input::placeholder { color: #94a3b8; opacity: 0.7; font-style: italic; }
+
+        .month-tab { cursor: pointer; padding: 8px 16px; border-bottom: 2px solid transparent; color: #64748b; font-weight: 500; transition: all 0.2s; white-space: nowrap; }
+        .month-tab:hover { color: #4f46e5; background-color: #f8fafc; }
+        .month-tab.active { border-bottom-color: #4f46e5; color: #4f46e5; background-color: #eef2ff; }
+
+        .clickable-cell { cursor: pointer; transition: background-color 0.2s; text-decoration: underline; text-decoration-color: #e2e8f0; text-underline-offset: 4px; }
+        .clickable-cell:hover { background-color: #eff6ff; text-decoration-color: #3b82f6; color: #1d4ed8; }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+        .modal { transition: opacity 0.25s ease; }
+        body.modal-active { overflow-y: hidden; }
+        .hidden { display: none; }
+        
+        .matrix-cell { padding: 8px; text-align: right; white-space: nowrap; font-size: 0.8rem; border-right: 1px solid #f1f5f9; }
+        .matrix-header { padding: 8px; text-align: center; font-weight: 600; font-size: 0.75rem; background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
+        .matrix-row:hover { background-color: #f8fafc; }
+        
+        .empty-state { text-align: center; padding: 2rem; color: #94a3b8; font-style: italic; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased selection:bg-indigo-100 selection:text-indigo-800">
+
+    <!-- Navigation -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                
+                <!-- Left: Branding & Year Selector -->
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-3">
+                        <!-- LOGO ICONA -->
+                        <div class="bg-indigo-600 text-white w-10 h-10 flex items-center justify-center rounded-lg shadow-md">
+                            <i class="fas fa-chart-pie text-xl"></i>
+                        </div>
+                        <div class="hidden md:flex flex-col justify-center">
+                            <!-- TITOLO PULITO -->
+                            <h1 class="text-xl font-bold text-slate-900 leading-none">
+                                Piano Finanziario
+                            </h1>
+                        </div>
+                    </div>
+
+                    <div class="h-8 w-px bg-slate-200 mx-1"></div>
+
+                    <!-- Year Selector -->
+                    <div class="flex items-center bg-slate-100 rounded-lg border border-slate-200 px-2 hover:border-indigo-300 transition-colors">
+                        <i class="fas fa-calendar-alt text-slate-500 text-xs mr-2"></i>
+                        <select id="yearSelector" onchange="changeYear(this.value)" class="bg-transparent border-none text-sm font-bold text-slate-700 focus:ring-0 cursor-pointer py-2 pr-4 outline-none">
+                            <!-- Populated via JS -->
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Right: Actions -->
+                <div class="flex items-center gap-2 md:gap-3">
+                    <button onclick="openReportModal()" class="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-bold transition-all mr-2 border border-slate-300">
+                        <i class="fas fa-chart-pie text-slate-500"></i>
+                        <span class="hidden sm:inline">Report</span>
+                    </button>
+
+                    <button onclick="openTransactionModal('expense')" class="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-sm font-bold shadow-md transition-transform transform hover:scale-105 active:scale-95">
+                        <i class="fas fa-minus-circle"></i>
+                        <span class="hidden sm:inline">Spesa</span>
+                    </button>
+
+                    <button onclick="openTransactionModal('income')" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-bold shadow-md transition-transform transform hover:scale-105 active:scale-95">
+                        <i class="fas fa-plus-circle"></i>
+                        <span class="hidden sm:inline">Entrata</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
+
+        <!-- DASHBOARD KPI -->
+        <section class="animate-fade-in-up">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-slate-500 uppercase">Totale Entrate <span id="kpi-year-label-1" class="text-xs normal-case opacity-50"></span></p>
+                        <p class="text-2xl font-bold text-emerald-600 mt-1" id="kpi-income">€0</p>
+                    </div>
+                    <div class="p-3 bg-emerald-50 rounded-full text-emerald-600"><i class="fas fa-arrow-up"></i></div>
+                </div>
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-slate-500 uppercase">Totale Uscite <span id="kpi-year-label-2" class="text-xs normal-case opacity-50"></span></p>
+                        <p class="text-2xl font-bold text-rose-600 mt-1" id="kpi-expense">€0</p>
+                    </div>
+                    <div class="p-3 bg-rose-50 rounded-full text-rose-600"><i class="fas fa-arrow-down"></i></div>
+                </div>
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between" id="kpi-delta-card">
+                    <div>
+                        <p class="text-sm font-medium text-slate-500 uppercase">Rimanenza Netta</p>
+                        <p class="text-2xl font-bold mt-1" id="kpi-balance">€0</p>
+                    </div>
+                    <div class="p-3 bg-white border border-slate-200 rounded-full" id="kpi-icon"><i class="fas fa-wallet"></i></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- MAIN EDITOR TABLE -->
+        <section id="editor-section" class="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
+            <div class="p-6 border-b border-slate-100 bg-slate-50">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+                            Registro Finanziario <span id="year-display" class="bg-indigo-100 text-indigo-700 text-sm px-2 py-0.5 rounded-full">...</span>
+                        </h2>
+                        <p class="text-sm text-slate-500 mt-1">Gestisci le previsioni e monitora il reale.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-3 items-center w-full lg:w-auto">
+                        <!-- MANAGE ITEMS BUTTON -->
+                        <button onclick="openManageItemsModal()" class="flex-1 lg:flex-none text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 focus:ring-4 focus:ring-indigo-100 font-medium rounded-lg text-sm px-4 py-2.5 inline-flex items-center justify-center transition-all shadow-sm">
+                            <i class="fas fa-cog mr-2 text-slate-500"></i> Gestisci Voci
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="flex overflow-x-auto custom-scrollbar border-b border-slate-200 bg-white" id="monthTabsContainer"></div>
+
+            <!-- Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left text-slate-600">
+                    <thead class="text-xs text-slate-500 uppercase bg-slate-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 w-1/3">Voce</th>
+                            <th scope="col" class="px-6 py-3 text-right w-1/4">
+                                <span class="bg-slate-200 text-slate-700 px-2 py-1 rounded">Budget</span>
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right w-1/4">
+                                <span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded">Reale (Click)</span>
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right w-1/6">Diff.</th>
+                        </tr>
+                    </thead>
+                    
+                    <!-- EXPENSES -->
+                    <tbody id="expenseTableBody" class="divide-y divide-slate-100 bg-white"></tbody>
+                    
+                    <!-- SEPARATOR -->
+                    <tbody class="bg-slate-100 border-t-2 border-slate-200">
+                        <tr>
+                            <td colspan="4" class="px-6 py-3 text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-2">
+                                <i class="fas fa-arrow-up"></i> Sezione Entrate
+                            </td>
+                        </tr>
+                    </tbody>
+
+                    <!-- INCOME -->
+                    <tbody id="incomeTableBody" class="divide-y divide-slate-100 bg-white"></tbody>
+
+                    <!-- FOOTER -->
+                    <tfoot class="bg-slate-50 font-bold text-slate-800 border-t-2 border-slate-200">
+                        <tr>
+                            <td class="px-6 py-3 text-rose-700">TOTALE USCITE</td>
+                            <td class="px-6 py-3 text-right text-rose-700" id="footer-exp-budget">€0</td>
+                            <td class="px-6 py-3 text-right text-rose-700" id="footer-exp-actual">€0</td>
+                            <td class="px-6 py-3 text-right text-slate-400">-</td>
+                        </tr>
+                        <tr class="bg-white">
+                            <td class="px-6 py-3 text-emerald-700">TOTALE ENTRATE</td>
+                            <td class="px-6 py-3 text-right text-emerald-700" id="footer-inc-budget">€0</td>
+                            <td class="px-6 py-3 text-right text-emerald-700" id="footer-inc-actual">€0</td>
+                            <td class="px-6 py-3 text-right text-slate-400">-</td>
+                        </tr>
+                        <tr class="bg-slate-800 text-white text-base">
+                            <td class="px-6 py-4">RIMANENZA (Netto)</td>
+                            <td class="px-6 py-4 text-right opacity-70" id="footer-net-budget">€0</td>
+                            <td class="px-6 py-4 text-right" id="footer-net-actual">€0</td>
+                            <td class="px-6 py-4 text-right" id="footer-net-diff">€0</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="bg-white border-t border-slate-200 mt-12 py-8">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center text-slate-400 text-sm">
+            <p>Piano Finanziario 2025 - v31 Michele Mancinelli</p>
+            <button onclick="askReset()" class="text-rose-300 hover:text-rose-500 mt-2 md:mt-0 text-xs cursor-pointer px-2 py-1 border border-rose-200 rounded">Reset Dati</button>
+        </div>
+    </footer>
+
+    <!-- MODALS SECTION -->
+    
+    <!-- Item Manager Modal -->
+    <div id="manageItemsModal" class="modal opacity-0 pointer-events-none fixed inset-0 z-[70] flex items-center justify-center p-4">
+        <div class="modal-overlay absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeModal('manageItemsModal')"></div>
+        <div class="modal-container bg-white w-full max-w-2xl mx-auto rounded-2xl shadow-2xl z-[70] overflow-hidden transform scale-95 transition-all duration-300 flex flex-col max-h-[90vh]">
+            <div class="bg-indigo-600 p-4 flex justify-between items-center text-white shrink-0">
+                <h3 class="font-bold text-lg"><i class="fas fa-tasks mr-2"></i>Gestisci Voci</h3>
+                <button onclick="closeModal('manageItemsModal')" class="hover:text-white/80"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="flex bg-indigo-50 border-b border-indigo-100 shrink-0">
+                <button onclick="switchManageType('expense')" id="tabManageExpense" class="flex-1 py-3 text-sm font-bold text-center text-indigo-700 border-b-2 border-indigo-600 bg-white">Uscite</button>
+                <button onclick="switchManageType('income')" id="tabManageIncome" class="flex-1 py-3 text-sm font-bold text-center text-slate-500 hover:text-indigo-600 transition-colors">Entrate</button>
+            </div>
+            <div class="p-4 bg-slate-50 border-b border-slate-200 shrink-0">
+                <div class="flex flex-col md:flex-row gap-3">
+                    <input type="hidden" id="manageEditIndex" value="-1">
+                    <div class="flex-1"><label class="block text-xs font-bold text-slate-400 uppercase mb-1">Categoria</label><input type="text" id="manageCategory" placeholder="Es. Casa" class="w-full border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+                    <div class="flex-1"><label class="block text-xs font-bold text-slate-400 uppercase mb-1">Voce</label><input type="text" id="manageName" placeholder="Es. Affitto" class="w-full border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+                    <div class="flex items-end"><button onclick="saveManagedItem()" id="btnManageSave" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-sm shadow transition-colors w-full md:w-auto">Aggiungi</button></div>
+                </div>
+            </div>
+            <div class="flex-grow overflow-y-auto p-0">
+                <table class="w-full text-sm text-left text-slate-600"><thead class="bg-slate-100 text-xs text-slate-500 uppercase sticky top-0"><tr><th class="px-6 py-3 w-1/3">Categoria</th><th class="px-6 py-3 w-1/3">Voce</th><th class="px-6 py-3 text-center">Azioni</th></tr></thead><tbody id="manageListBody" class="divide-y divide-slate-100"></tbody></table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="modal opacity-0 pointer-events-none fixed inset-0 z-[80] flex items-center justify-center p-4">
+        <div class="modal-overlay absolute inset-0 bg-slate-900/40 backdrop-blur-sm"></div>
+        <div class="modal-container bg-white w-full max-w-sm mx-auto rounded-xl shadow-2xl z-[80] overflow-hidden transform scale-95 transition-all duration-300">
+            <div class="p-6 text-center">
+                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-rose-100 mb-4"><i class="fas fa-trash-alt text-rose-600 text-xl"></i></div>
+                <h3 class="text-lg font-bold text-slate-900 mb-2">Eliminare la voce?</h3>
+                <p class="text-sm text-slate-500 mb-6">Questa azione rimuoverà la voce e tutti i dati associati in questo anno. Non si può annullare.</p>
+                <div class="flex justify-center gap-3">
+                    <button onclick="closeConfirmModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition-colors">Annulla</button>
+                    <button id="btnConfirmAction" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-bold shadow transition-colors">Elimina</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Alert Modal -->
+    <div id="alertModal" class="modal opacity-0 pointer-events-none fixed inset-0 z-[90] flex items-center justify-center p-4">
+        <div class="modal-overlay absolute inset-0 bg-slate-900/40"></div>
+        <div class="modal-container bg-white w-full max-w-sm mx-auto rounded-xl shadow-2xl z-[90] overflow-hidden transform scale-95 transition-all duration-300">
+            <div class="p-6 text-center">
+                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 mb-4"><i class="fas fa-info-circle text-indigo-600 text-xl"></i></div>
+                <h3 class="text-lg font-bold text-slate-900 mb-2">Avviso</h3>
+                <p id="alertMessage" class="text-sm text-slate-500 mb-6">Messaggio</p>
+                <button onclick="closeAlertModal()" class="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow transition-colors">OK</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Report Modal -->
+    <div id="reportModal" class="modal opacity-0 pointer-events-none fixed inset-0 z-[70] flex items-center justify-center p-0 sm:p-4"><div class="modal-overlay absolute inset-0 bg-slate-900/80 backdrop-blur-sm" onclick="closeModal('reportModal')"></div><div class="modal-container bg-white w-full h-full sm:h-auto sm:max-h-[95vh] sm:max-w-6xl mx-auto rounded-none sm:rounded-2xl shadow-2xl z-[70] overflow-hidden flex flex-col"><div class="bg-slate-800 p-4 flex justify-between items-center text-white shrink-0"><div><h3 class="font-bold text-xl"><i class="fas fa-chart-pie mr-2"></i>Analisi</h3><p class="text-xs text-slate-400" id="reportYearLabel">Anno</p></div><button onclick="closeModal('reportModal')" class="hover:text-white/80 p-2"><i class="fas fa-times fa-lg"></i></button></div><div class="flex-grow overflow-y-auto p-4 sm:p-8 bg-slate-50 space-y-8"><div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6"><h4 class="text-lg font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">1. Riepilogo per Categoria</h4><div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="px-6 py-3">Categoria</th><th class="px-6 py-3 text-right">Mese Corrente</th><th class="px-6 py-3 text-right">Totale Anno</th><th class="px-6 py-3 text-right">Media Mensile</th></tr></thead><tbody id="reportCategoryBody" class="divide-y divide-slate-100"></tbody></table></div></div><div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6"><h4 class="text-lg font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">2. Matrice Annuale Completa</h4><div class="overflow-x-auto custom-scrollbar border border-slate-200 rounded-lg max-h-[500px]"><table class="w-full text-sm border-collapse"><thead class="bg-slate-100 sticky top-0 z-10 text-slate-700"><tr><th class="matrix-header text-left min-w-[150px] sticky left-0 z-20 bg-slate-100 border-r">Voce</th><th class="matrix-header">Gen</th><th class="matrix-header">Feb</th><th class="matrix-header">Mar</th><th class="matrix-header">Apr</th><th class="matrix-header">Mag</th><th class="matrix-header">Giu</th><th class="matrix-header">Lug</th><th class="matrix-header">Ago</th><th class="matrix-header">Set</th><th class="matrix-header">Ott</th><th class="matrix-header">Nov</th><th class="matrix-header">Dic</th><th class="matrix-header bg-indigo-50 text-indigo-800">TOT</th></tr></thead><tbody id="reportMatrixBody" class="bg-white"></tbody></table></div></div></div></div></div>
+
+    <!-- Transaction Modal -->
+    <div id="transactionModal" class="modal opacity-0 pointer-events-none fixed inset-0 z-[60] flex items-center justify-center p-4"><div class="modal-overlay absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeModal('transactionModal')"></div><div class="modal-container bg-white w-full max-w-md mx-auto rounded-2xl shadow-2xl z-[60] overflow-hidden transform scale-95 transition-all duration-300"><div id="transModalHeader" class="p-4 flex justify-between items-center text-white transition-colors"><h3 class="font-bold text-lg" id="transModalTitle">Registra</h3><button onclick="closeModal('transactionModal')" class="hover:text-white/80"><i class="fas fa-times"></i></button></div><div class="p-6 space-y-4"><input type="hidden" id="transId"><input type="hidden" id="transType"><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Data Operazione</label><input type="date" id="transDate" class="w-full border-slate-200 rounded-lg p-3 bg-slate-50 focus:ring-2 outline-none font-medium text-slate-700"></div><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Categoria</label><select id="transCategory" onchange="updateItemSelect()" class="w-full border-slate-200 rounded-lg p-3 bg-slate-50 focus:ring-2 outline-none"></select></div><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Voce</label><select id="transItem" class="w-full border-slate-200 rounded-lg p-3 bg-slate-50 focus:ring-2 outline-none"></select></div><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Importo (€)</label><input type="number" id="transAmount" step="0.01" class="w-full border-slate-200 rounded-lg p-3 bg-slate-50 focus:ring-2 outline-none font-bold text-lg"></div><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Note</label><input type="text" id="transNote" class="w-full border-slate-200 rounded-lg p-3 bg-slate-50 focus:ring-2 outline-none"></div><button onclick="saveTransaction()" id="transSaveBtn" class="w-full text-white font-bold py-3 rounded-lg shadow-lg hover:shadow-xl transition-all transform active:scale-95">Salva</button></div></div></div>
+
+    <!-- Detail List Modal -->
+    <div id="detailModal" class="modal opacity-0 pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4"><div class="modal-overlay absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeModal('detailModal')"></div><div class="modal-container bg-white w-full max-w-lg mx-auto rounded-2xl shadow-2xl z-50 overflow-hidden transform scale-95 transition-all duration-300 flex flex-col max-h-[90vh]"><div id="detailHeader" class="p-4 flex justify-between items-center text-white shrink-0"><div><h3 class="font-bold text-lg" id="detailModalTitle">Dettaglio</h3><p class="text-xs opacity-80" id="detailModalSubtitle">Analisi</p></div><button onclick="closeModal('detailModal')" class="hover:text-white/80"><i class="fas fa-times"></i></button></div><div class="p-0 overflow-y-auto flex-grow"><table class="w-full text-sm text-left text-slate-600"><tbody id="detailModalBody" class="divide-y divide-slate-100"></tbody></table></div><div class="p-4 bg-slate-50 border-t border-slate-200 shrink-0"><button id="btnQuickAdd" class="w-full font-bold py-3 rounded-lg shadow text-white transition-all flex items-center justify-center gap-2"><i class="fas fa-plus-circle"></i> Aggiungi qui</button></div></div></div>
+
+    <!-- LOGIC -->
+    <script>
+        const months = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
+        const shortMonths = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+
+        let currentYear = 2025;
+        let currentMonthView = new Date().getMonth();
+        let expenseData = [], incomeData = [], transactions = []; 
+
+        function initApp() {
+            const sel = document.getElementById('yearSelector');
+            let opts = ''; for(let y=2025; y<=2040; y++) { opts += `<option value="${y}">${y}</option>`; }
+            sel.innerHTML = opts;
+            const storedYear = localStorage.getItem('fm_current_year');
+            currentYear = storedYear ? parseInt(storedYear) : 2025;
+            sel.value = currentYear;
+            loadYearData(currentYear);
+            renderTabs();
+            updateUI();
+        }
+
+        // --- NEW CUSTOM MODALS LOGIC ---
+        function showCustomAlert(msg) {
+            document.getElementById('alertMessage').innerText = msg;
+            toggleModal('alertModal', true);
+        }
+        function closeAlertModal() { toggleModal('alertModal', false); }
+
+        function showCustomConfirm(onConfirm) {
+            const btn = document.getElementById('btnConfirmAction');
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            newBtn.addEventListener('click', () => { onConfirm(); closeConfirmModal(); });
+            toggleModal('confirmModal', true);
+        }
+        function closeConfirmModal() { toggleModal('confirmModal', false); }
+        function askReset() { showCustomConfirm(() => { localStorage.clear(); window.location.href = window.location.href; }); }
+
+        // --- MANAGER LOGIC ---
+        let currentManageType = 'expense';
+        let manageEditIndex = -1;
+
+        function openManageItemsModal() { switchManageType('expense'); toggleModal('manageItemsModal', true); }
+
+        function switchManageType(type) {
+            currentManageType = type;
+            const tabExp = document.getElementById('tabManageExpense');
+            const tabInc = document.getElementById('tabManageIncome');
+            if(type === 'expense') {
+                tabExp.className = "flex-1 py-3 text-sm font-bold text-center text-indigo-700 border-b-2 border-indigo-600 bg-white";
+                tabInc.className = "flex-1 py-3 text-sm font-bold text-center text-slate-500 hover:text-indigo-600 transition-colors";
+            } else {
+                tabExp.className = "flex-1 py-3 text-sm font-bold text-center text-slate-500 hover:text-indigo-600 transition-colors";
+                tabInc.className = "flex-1 py-3 text-sm font-bold text-center text-indigo-700 border-b-2 border-indigo-600 bg-white";
+            }
+            resetManageForm();
+            renderManageList();
+        }
+
+        function resetManageForm() {
+            manageEditIndex = -1;
+            document.getElementById('manageEditIndex').value = -1;
+            document.getElementById('manageCategory').value = '';
+            document.getElementById('manageName').value = '';
+            document.getElementById('btnManageSave').innerText = 'Aggiungi';
+            document.getElementById('btnManageSave').className = "bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-sm shadow transition-colors w-full md:w-auto";
+        }
+
+        function renderManageList() {
+            const list = currentManageType === 'expense' ? expenseData : incomeData;
+            const tbody = document.getElementById('manageListBody');
+            tbody.innerHTML = '';
+            
+            if(list.length === 0) { tbody.innerHTML = `<tr><td colspan="3" class="text-center p-8 text-slate-400 italic">Nessuna voce presente.</td></tr>`; return; }
+
+            const sortedList = list.map((item, idx) => ({...item, originalIdx: idx})).sort((a,b) => a.group.localeCompare(b.group) || a.name.localeCompare(b.name));
+
+            sortedList.forEach(item => {
+                tbody.innerHTML += `
+                <tr class="hover:bg-slate-50 border-b border-slate-50">
+                    <td class="px-6 py-3 font-medium text-indigo-600">${item.group}</td>
+                    <td class="px-6 py-3 font-medium text-slate-700">${item.name}</td>
+                    <td class="px-6 py-3 text-center space-x-2">
+                        <button onclick="editManagedItem(${item.originalIdx})" class="text-blue-500 hover:text-blue-700 p-1" title="Modifica"><i class="fas fa-pencil-alt"></i></button>
+                        <button onclick="askDeleteManagedItem(${item.originalIdx})" class="text-rose-500 hover:text-rose-700 p-1" title="Elimina"><i class="fas fa-trash-alt"></i></button>
+                    </td>
+                </tr>`;
+            });
+        }
+
+        function saveManagedItem() {
+            const group = document.getElementById('manageCategory').value.trim();
+            const name = document.getElementById('manageName').value.trim();
+            const idx = parseInt(document.getElementById('manageEditIndex').value);
+            const list = currentManageType === 'expense' ? expenseData : incomeData;
+
+            if(!group || !name) { showCustomAlert("Compila tutti i campi"); return; }
+            const exists = list.find((item, i) => item.group.toLowerCase() === group.toLowerCase() && item.name.toLowerCase() === name.toLowerCase() && i !== idx);
+            if(exists) { showCustomAlert("Voce già esistente."); return; }
+
+            if(idx > -1) {
+                const oldGroup = list[idx].group; const oldName = list[idx].name;
+                list[idx].group = group; list[idx].name = name;
+                transactions.forEach(t => { if(t.type === currentManageType && t.group === oldGroup && t.name === oldName) { t.group = group; t.name = name; } });
+            } else {
+                list.push({ group, name, budget: Array(12).fill(0), baseActual: Array(12).fill(0) });
+            }
+            saveData(); resetManageForm(); renderManageList(); updateUI();
+        }
+
+        function editManagedItem(index) {
+            const list = currentManageType === 'expense' ? expenseData : incomeData;
+            const item = list[index];
+            document.getElementById('manageCategory').value = item.group;
+            document.getElementById('manageName').value = item.name;
+            document.getElementById('manageEditIndex').value = index;
+            document.getElementById('btnManageSave').innerText = 'Salva Modifica';
+            document.getElementById('btnManageSave').className = "bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg text-sm shadow transition-colors w-full md:w-auto";
+            document.querySelector('#manageItemsModal .modal-container').scrollTop = 0;
+        }
+
+        function askDeleteManagedItem(index) {
+            showCustomConfirm(() => {
+                const list = currentManageType === 'expense' ? expenseData : incomeData;
+                list.splice(index, 1);
+                saveData();
+                renderManageList();
+                updateUI();
+            });
+        }
+
+        // --- REPORT LOGIC ---
+        function openReportModal() { 
+            document.getElementById('reportYearLabel').innerText = `Anno ${currentYear}`; 
+            renderReportCategory(); 
+            renderReportMatrix(); 
+            toggleModal('reportModal', true); 
+        }
+
+        function renderReportCategory() {
+            const tbody = document.getElementById('reportCategoryBody'); 
+            tbody.innerHTML = '';
+            const groups = [...new Set([...expenseData.map(i => i.group)])];
+            
+            groups.forEach(group => {
+                const targetMonth = currentMonthView === 12 ? new Date().getMonth() : currentMonthView;
+                let monthTotal = 0, yearTotal = 0;
+                
+                // Expenses
+                expenseData.filter(i => i.group === group).forEach(item => { 
+                    monthTotal += getTotalActual('expense', item.group, item.name, targetMonth); 
+                    for(let m=0; m<12; m++) yearTotal += getTotalActual('expense', item.group, item.name, m); 
+                });
+                
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 border-b border-slate-50">
+                        <td class="px-6 py-4 font-medium text-slate-700">${group}</td>
+                        <td class="px-6 py-4 text-right font-bold text-slate-800">${formatMoney(monthTotal)}</td>
+                        <td class="px-6 py-4 text-right font-bold text-indigo-600">${formatMoney(yearTotal)}</td>
+                        <td class="px-6 py-4 text-right text-slate-500 text-xs">${formatMoney(yearTotal/12)}</td>
+                    </tr>`;
+            });
+        }
+
+        function renderReportMatrix() {
+            const tbody = document.getElementById('reportMatrixBody'); 
+            tbody.innerHTML = '';
+            const allItems = [...expenseData].sort((a,b) => a.group.localeCompare(b.group));
+            
+            allItems.forEach(item => {
+                let rowHtml = `<td class="matrix-cell text-left font-medium text-slate-700 sticky left-0 bg-white border-r z-20"><div class="truncate max-w-[140px]" title="${item.name}">${item.name}</div><div class="text-[10px] text-slate-400">${item.group}</div></td>`;
+                let rowTotal = 0;
+                for(let m=0; m<12; m++) {
+                    const val = getTotalActual('expense', item.group, item.name, m); 
+                    rowTotal += val;
+                    const colorClass = val > 0 ? 'text-slate-700 font-medium' : 'text-slate-300';
+                    const bgClass = val > (item.budget[m]*1.2) && item.budget[m] > 0 ? 'bg-rose-50' : '';
+                    rowHtml += `<td class="matrix-cell ${colorClass} ${bgClass}">${val > 0 ? Math.round(val) : '-'}</td>`;
+                }
+                rowHtml += `<td class="matrix-cell font-bold text-indigo-700 bg-indigo-50 border-l">${formatMoney(rowTotal)}</td>`;
+                tbody.innerHTML += `<tr class="matrix-row">${rowHtml}</tr>`;
+            });
+        }
+
+        // --- DATA LOGIC ---
+        function loadYearData(year) {
+            const json = localStorage.getItem(`fm_year_${year}`);
+            if(json) { try { const data = JSON.parse(json); expenseData = data.expenseData || []; incomeData = data.incomeData || []; transactions = data.transactions || []; } catch(e) { expenseData = []; incomeData = []; transactions = []; } } 
+            else { 
+                if(year === 2025) { expenseData = []; incomeData = []; }
+                else {
+                    const prevYear = localStorage.getItem(`fm_year_${year-1}`);
+                    if(prevYear) { try { const prev = JSON.parse(prevYear); expenseData = prev.expenseData.map(i => ({...i, budget:Array(12).fill(0), baseActual:Array(12).fill(0)})); incomeData = prev.incomeData.map(i => ({...i, budget:Array(12).fill(0), baseActual:Array(12).fill(0)})); } catch(e) { expenseData=[]; incomeData=[]; } } 
+                    else { expenseData=[]; incomeData=[]; }
+                }
+                transactions = []; saveYearData(year);
+            }
+        }
+        function saveYearData(year) { const payload = { expenseData, incomeData, transactions }; localStorage.setItem(`fm_year_${year}`, JSON.stringify(payload)); }
+        function changeYear(newYear) { saveYearData(currentYear); currentYear = parseInt(newYear); localStorage.setItem('fm_current_year', currentYear); loadYearData(currentYear); updateUI(); }
+        function saveData() { saveYearData(currentYear); updateUI(); }
+        function updateUI() { document.getElementById('year-display').innerText = currentYear; document.getElementById('kpi-year-label-1').innerText = `(${currentYear})`; document.getElementById('kpi-year-label-2').innerText = `(${currentYear})`; calculateKPIs(); renderTable(); }
+
+        // --- CALCS & RENDER ---
+        const formatMoney = (val) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(val);
+        const sumArr = (arr) => arr.reduce((a, b) => a + (Number(b) || 0), 0);
+        function getTotalActual(type, group, name, monthIndex) {
+            const list = type === 'expense' ? expenseData : incomeData; const item = list.find(i => i.group === group && i.name === name); if (!item) return 0;
+            let val = item.baseActual[monthIndex] || 0;
+            const relatedTrans = transactions.filter(t => { const d = new Date(t.date); return t.type === type && t.group === group && t.name === name && d.getMonth() === monthIndex; });
+            relatedTrans.forEach(t => val += t.amount); return val;
+        }
+        function calculateKPIs() {
+            let totExp = 0, totInc = 0;
+            expenseData.forEach(item => { for(let m=0; m<12; m++) totExp += getTotalActual('expense', item.group, item.name, m); });
+            incomeData.forEach(item => { for(let m=0; m<12; m++) totInc += getTotalActual('income', item.group, item.name, m); });
+            const balance = totInc - totExp;
+            document.getElementById('kpi-income').innerText = formatMoney(totInc); document.getElementById('kpi-expense').innerText = formatMoney(totExp); document.getElementById('kpi-balance').innerText = formatMoney(balance);
+            const balCard = document.getElementById('kpi-delta-card'); const balIcon = document.getElementById('kpi-icon');
+            if (balance >= 0) { document.getElementById('kpi-balance').className = "text-2xl font-bold mt-1 text-emerald-600"; balCard.className = "bg-white p-5 rounded-xl shadow-sm border border-l-4 border-emerald-500 flex items-center justify-between"; balIcon.className = "p-3 bg-emerald-50 rounded-full text-emerald-600"; } 
+            else { document.getElementById('kpi-balance').className = "text-2xl font-bold mt-1 text-rose-600"; balCard.className = "bg-white p-5 rounded-xl shadow-sm border border-l-4 border-rose-500 flex items-center justify-between"; balIcon.className = "p-3 bg-rose-50 rounded-full text-rose-600"; }
+        }
+        function renderTabs() { const container = document.getElementById('monthTabsContainer'); let html = ''; shortMonths.forEach((m, idx) => { const activeClass = idx === currentMonthView ? 'active' : ''; html += `<div onclick="switchMonth(${idx})" class="month-tab ${activeClass}">${m}</div>`; }); const activeTotal = currentMonthView === 12 ? 'active' : ''; html += `<div onclick="switchMonth(12)" class="month-tab ${activeTotal}">TOTALE ANNO</div>`; container.innerHTML = html; }
+        function switchMonth(idx) { currentMonthView = idx; renderTabs(); renderTable(); }
+        function updateBudget(type, index, value) { const list = type === 'expense' ? expenseData : incomeData; list[index].budget[currentMonthView] = parseFloat(value) || 0; saveData(); }
+
+        function renderRow(item, index, type) {
+            let budgetVal = 0, actualVal = 0, budgetHtml = '', actualHtml = '';
+            const isAnnual = currentMonthView === 12;
+            if (isAnnual) {
+                budgetVal = sumArr(item.budget); for(let m=0; m<12; m++) actualVal += getTotalActual(type, item.group, item.name, m);
+                budgetHtml = `<span class="font-bold text-slate-700">${formatMoney(budgetVal)}</span>`;
+                actualHtml = `<div onclick="openDetailModal('${type}', '${item.group}', '${item.name}', 12)" class="clickable-cell font-bold ${type==='income'?'text-emerald-700':'text-rose-700'} px-2 py-1 rounded">${formatMoney(actualVal)} <i class="fas fa-search text-xs ml-1 opacity-50"></i></div>`;
+            } else {
+                budgetVal = item.budget[currentMonthView]; actualVal = getTotalActual(type, item.group, item.name, currentMonthView);
+                let prevSuggestion = ''; if (currentMonthView > 0) { const prevBudget = item.budget[currentMonthView - 1]; if (prevBudget > 0) prevSuggestion = prevBudget; }
+                const displayValue = budgetVal === 0 ? '' : budgetVal; 
+                budgetHtml = `<input type="number" step="0.01" value="${displayValue}" data-suggest="${prevSuggestion}" onfocus="if(this.value===''){this.placeholder=this.getAttribute('data-suggest')}" onblur="this.placeholder=''" onchange="updateBudget('${type}', ${index}, this.value)" class="budget-input bg-white focus:bg-indigo-50">`;
+                actualHtml = `<div onclick="openDetailModal('${type}', '${item.group}', '${item.name}', ${currentMonthView})" class="clickable-cell font-bold ${type==='income'?'text-emerald-700':'text-rose-700'} px-2 py-1 rounded">${formatMoney(actualVal)} <i class="fas fa-search text-xs ml-1 opacity-50"></i></div>`;
+            }
+            const diffVal = type === 'expense' ? (budgetVal - actualVal) : (actualVal - budgetVal);
+            let diffClass = Math.abs(diffVal) < 0.01 ? 'text-slate-400' : (diffVal >= 0 ? 'text-emerald-600' : 'text-rose-600');
+            return { html: `<tr class="hover:bg-slate-50 border-b border-slate-50"><td class="px-6 py-4 font-medium"><div class="text-slate-900">${item.name}</div><div class="text-xs text-slate-400">${item.group}</div></td><td class="px-6 py-4 text-right">${budgetHtml}</td><td class="px-6 py-4 text-right">${actualHtml}</td><td class="px-6 py-4 text-right font-bold ${diffClass}">${formatMoney(diffVal)}</td></tr>`, b: budgetVal, a: actualVal };
+        }
+
+        function renderTable() {
+            const expBody = document.getElementById('expenseTableBody'); expBody.innerHTML = ''; let expBud = 0, expAct = 0;
+            if (expenseData.length === 0) { expBody.innerHTML = `<tr><td colspan="4" class="empty-state">Nessuna voce di spesa. Clicca "Gestisci Voci".</td></tr>`; } 
+            else { expenseData.forEach((item, idx) => { const res = renderRow(item, idx, 'expense'); expBody.innerHTML += res.html; expBud += res.b; expAct += res.a; }); }
+            const incBody = document.getElementById('incomeTableBody'); incBody.innerHTML = ''; let incBud = 0, incAct = 0;
+            if (incomeData.length === 0) { incBody.innerHTML = `<tr><td colspan="4" class="empty-state">Nessuna voce di entrata.</td></tr>`; } 
+            else { incomeData.forEach((item, idx) => { const res = renderRow(item, idx, 'income'); incBody.innerHTML += res.html; incBud += res.b; incAct += res.a; }); }
+            document.getElementById('footer-exp-budget').innerText = formatMoney(expBud); document.getElementById('footer-exp-actual').innerText = formatMoney(expAct);
+            document.getElementById('footer-inc-budget').innerText = formatMoney(incBud); document.getElementById('footer-inc-actual').innerText = formatMoney(incAct);
+            const netBud = incBud - expBud; const netAct = incAct - expAct;
+            document.getElementById('footer-net-budget').innerText = formatMoney(netBud); document.getElementById('footer-net-actual').innerText = formatMoney(netAct);
+            document.getElementById('footer-net-diff').innerText = formatMoney(netAct); document.getElementById('footer-net-diff').className = `px-6 py-4 text-right font-bold text-lg ${netAct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+        }
+
+        // --- SHARED MODAL LOGIC ---
+        function toggleModal(id, show) { const m = document.getElementById(id); const c = m.querySelector('.modal-container'); if(show) { m.classList.remove('opacity-0', 'pointer-events-none'); c.classList.remove('scale-95'); c.classList.add('scale-100'); document.body.classList.add('modal-active'); } else { m.classList.add('opacity-0', 'pointer-events-none'); c.classList.remove('scale-100'); c.classList.add('scale-95'); document.body.classList.remove('modal-active'); } }
+        function closeModal(id) { toggleModal(id, false); }
+        // ... (Other modal functions remain similar but using showCustomAlert/Confirm) ...
+        function openTransactionModal(type, preGroup, preName, preMonth) { const isInc = type === 'income'; document.getElementById('transType').value = type; const color = isInc ? 'bg-emerald-600' : 'bg-rose-600'; const btnColor = isInc ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'; document.getElementById('transModalHeader').className = `p-4 flex justify-between items-center text-white ${color}`; document.getElementById('transModalTitle').innerHTML = isInc ? '<i class="fas fa-plus-circle mr-2"></i>Nuova Entrata' : '<i class="fas fa-minus-circle mr-2"></i>Nuova Spesa'; document.getElementById('transSaveBtn').className = `w-full text-white font-bold py-3 rounded-lg shadow-lg hover:shadow-xl transition-all transform active:scale-95 ${btnColor}`; document.getElementById('transId').value = ''; const now = new Date(); const dateStr = now.toISOString().split('T')[0]; document.getElementById('transDate').value = dateStr; populateTransForm(type); if(preGroup) document.getElementById('transCategory').value = preGroup; updateItemSelect(); if(preName) document.getElementById('transItem').value = preName; document.getElementById('transAmount').value = ''; document.getElementById('transNote').value = ''; toggleModal('transactionModal', true); }
+        function populateTransForm(type) { const list = type === 'income' ? incomeData : expenseData; const groups = [...new Set(list.map(i => i.group))]; document.getElementById('transCategory').innerHTML = groups.map(g => `<option value="${g}">${g}</option>`).join(''); updateItemSelect(); }
+        function updateItemSelect() { const type = document.getElementById('transType').value; const cat = document.getElementById('transCategory').value; const list = type === 'income' ? incomeData : expenseData; const items = list.filter(i => i.group === cat); document.getElementById('transItem').innerHTML = items.map(i => `<option value="${i.name}">${i.name}</option>`).join(''); }
+        function saveTransaction() { const id = document.getElementById('transId').value; const type = document.getElementById('transType').value; const group = document.getElementById('transCategory').value; const name = document.getElementById('transItem').value; const dateVal = document.getElementById('transDate').value; const amount = parseFloat(document.getElementById('transAmount').value); const note = document.getElementById('transNote').value; if(!amount || isNaN(amount)) { showCustomAlert("Inserisci importo"); return; } if(!dateVal) { showCustomAlert("Data mancante"); return; } const newTrans = { id: id ? parseInt(id) : Date.now(), type, group, name, date: dateVal, amount, note }; if(id) { const idx = transactions.findIndex(t => t.id == id); if(idx !== -1) transactions[idx] = newTrans; } else { transactions.push(newTrans); } saveData(); toggleModal('transactionModal', false); if(currentDetailCtx) renderDetailList(); if(!document.getElementById('reportModal').classList.contains('pointer-events-none')) openReportModal(); }
+        let currentDetailCtx = null;
+        function openDetailModal(type, group, name, monthIndex) { currentDetailCtx = { type, group, name, monthIndex }; const isInc = type === 'income'; document.getElementById('detailHeader').className = `p-4 flex justify-between items-center text-white shrink-0 ${isInc ? 'bg-emerald-600' : 'bg-rose-600'}`; document.getElementById('detailModalTitle').innerText = name; document.getElementById('detailModalSubtitle').innerText = monthIndex === 12 ? 'Riepilogo Annuale' : `${months[monthIndex]} - ${group}`; document.getElementById('btnQuickAdd').className = `w-full font-bold py-3 rounded-lg shadow text-white transition-all flex items-center justify-center gap-2 ${isInc ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}`; document.getElementById('btnQuickAdd').onclick = () => openTransactionModal(type, group, name, monthIndex === 12 ? undefined : monthIndex); renderDetailList(); toggleModal('detailModal', true); }
+        function renderDetailList() { if(!currentDetailCtx) return; const { type, group, name, monthIndex } = currentDetailCtx; const tbody = document.getElementById('detailModalBody'); tbody.innerHTML = ''; const list = type === 'income' ? incomeData : expenseData; const item = list.find(i => i.group === group && i.name === name); if (!item) return; let baseVal = monthIndex === 12 ? sumArr(item.baseActual) : (item.baseActual[monthIndex] || 0); if (baseVal !== 0) tbody.innerHTML += `<tr class="bg-slate-50"><td class="px-6 py-3 italic text-slate-500">Base Iniziale</td><td class="px-6 py-3 text-right">${formatMoney(baseVal)}</td><td></td></tr>`; let related = transactions.filter(t => { const d = new Date(t.date); const m = d.getMonth(); const matchMonth = (monthIndex === 12) || (m === monthIndex); return t.type === type && t.group === group && t.name === name && matchMonth; }); related.sort((a,b) => new Date(b.date) - new Date(a.date)); related.forEach(t => { const d = new Date(t.date); const dayStr = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`; tbody.innerHTML += `<tr class="hover:bg-slate-50"><td class="px-6 py-3 text-slate-700"><span class="text-xs font-bold text-slate-400 mr-2">${dayStr}</span>${t.note || 'Manuale'}</td><td class="px-6 py-3 text-right font-bold ${type==='income'?'text-emerald-600':'text-rose-600'}">${formatMoney(t.amount)}</td><td class="px-6 py-3 text-center space-x-2"><button onclick="editTrans(${t.id})" class="text-blue-500"><i class="fas fa-pencil-alt"></i></button><button onclick="deleteTrans(${t.id})" class="text-rose-500"><i class="fas fa-trash"></i></button></td></tr>`; }); }
+        function editTrans(id) { const t = transactions.find(x => x.id === id); if(!t) return; openTransactionModal(t.type); document.getElementById('transId').value = id; document.getElementById('transCategory').value = t.group; updateItemSelect(); document.getElementById('transItem').value = t.name; document.getElementById('transDate').value = t.date; document.getElementById('transAmount').value = t.amount; document.getElementById('transNote').value = t.note || ''; }
+        function deleteTrans(id) { showCustomConfirm(() => { transactions = transactions.filter(t => t.id !== id); saveData(); renderDetailList(); updateUI(); }); }
+        
+        window.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
