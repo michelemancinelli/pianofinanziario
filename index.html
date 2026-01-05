@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Piano Finanziario 2025 - v31 (Fixed)</title>
+    <title>Piano Finanziario 2025 - v32</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -66,12 +66,10 @@
                 <!-- Left: Branding & Year Selector -->
                 <div class="flex items-center gap-4">
                     <div class="flex items-center gap-3">
-                        <!-- LOGO ICONA -->
                         <div class="bg-indigo-600 text-white w-10 h-10 flex items-center justify-center rounded-lg shadow-md">
                             <i class="fas fa-chart-pie text-xl"></i>
                         </div>
                         <div class="hidden md:flex flex-col justify-center">
-                            <!-- TITOLO PULITO -->
                             <h1 class="text-xl font-bold text-slate-900 leading-none">
                                 Piano Finanziario
                             </h1>
@@ -220,9 +218,24 @@
     </main>
 
     <footer class="bg-white border-t border-slate-200 mt-12 py-8">
-        <div class="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center text-slate-400 text-sm">
-            <p>Piano Finanziario 2025 - v31 Michele Mancinelli</p>
-            <button onclick="askReset()" class="text-rose-300 hover:text-rose-500 mt-2 md:mt-0 text-xs cursor-pointer px-2 py-1 border border-rose-200 rounded">Reset Dati</button>
+        <div class="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center text-slate-400 text-sm gap-4">
+            <p>Piano Finanziario 2025 - v32 Michele Mancinelli</p>
+            
+            <div class="flex items-center gap-3">
+                <!-- BACKUP & RESTORE SECTION -->
+                <button onclick="downloadBackup()" class="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium px-3 py-1 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition-colors">
+                    <i class="fas fa-download"></i> Backup
+                </button>
+                
+                <label for="restoreInput" class="flex items-center gap-1 text-slate-600 hover:text-slate-800 font-medium px-3 py-1 bg-slate-50 hover:bg-slate-100 rounded border border-slate-200 transition-colors cursor-pointer">
+                    <i class="fas fa-upload"></i> Ripristina
+                </label>
+                <input type="file" id="restoreInput" accept=".json" class="hidden" onchange="restoreBackup(this)">
+
+                <div class="h-4 w-px bg-slate-300 mx-2"></div>
+                
+                <button onclick="askReset()" class="text-rose-400 hover:text-rose-600 text-xs cursor-pointer">Reset Dati</button>
+            </div>
         </div>
     </footer>
 
@@ -331,6 +344,60 @@
         function closeConfirmModal() { toggleModal('confirmModal', false); }
         function askReset() { showCustomConfirm(() => { localStorage.clear(); window.location.href = window.location.href; }); }
 
+        // --- BACKUP & RESTORE LOGIC ---
+        function downloadBackup() {
+            const data = {};
+            const keysToSave = ['fm_current_year'];
+            
+            // Current State
+            data['fm_current_year'] = localStorage.getItem('fm_current_year');
+            
+            // Loop for years 2025-2040
+            for(let y=2025; y<=2040; y++) {
+                const k = `fm_year_${y}`;
+                const val = localStorage.getItem(k);
+                if(val) data[k] = val;
+            }
+
+            const jsonStr = JSON.stringify(data);
+            const blob = new Blob([jsonStr], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Backup_Finanziario_${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function restoreBackup(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    // Validate basics
+                    if(!data.fm_current_year) throw new Error("File non valido");
+
+                    // Clear & Restore
+                    localStorage.clear();
+                    for(const key in data) {
+                        localStorage.setItem(key, data[key]);
+                    }
+                    
+                    showCustomAlert("Backup ripristinato con successo!");
+                    setTimeout(() => window.location.reload(), 1500);
+                } catch(err) {
+                    showCustomAlert("Errore nel ripristino: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+
         // --- MANAGER LOGIC ---
         let currentManageType = 'expense';
         let manageEditIndex = -1;
@@ -421,59 +488,6 @@
                 saveData();
                 renderManageList();
                 updateUI();
-            });
-        }
-
-        // --- REPORT LOGIC ---
-        function openReportModal() { 
-            document.getElementById('reportYearLabel').innerText = `Anno ${currentYear}`; 
-            renderReportCategory(); 
-            renderReportMatrix(); 
-            toggleModal('reportModal', true); 
-        }
-
-        function renderReportCategory() {
-            const tbody = document.getElementById('reportCategoryBody'); 
-            tbody.innerHTML = '';
-            const groups = [...new Set([...expenseData.map(i => i.group)])];
-            
-            groups.forEach(group => {
-                const targetMonth = currentMonthView === 12 ? new Date().getMonth() : currentMonthView;
-                let monthTotal = 0, yearTotal = 0;
-                
-                // Expenses
-                expenseData.filter(i => i.group === group).forEach(item => { 
-                    monthTotal += getTotalActual('expense', item.group, item.name, targetMonth); 
-                    for(let m=0; m<12; m++) yearTotal += getTotalActual('expense', item.group, item.name, m); 
-                });
-                
-                tbody.innerHTML += `
-                    <tr class="hover:bg-slate-50 border-b border-slate-50">
-                        <td class="px-6 py-4 font-medium text-slate-700">${group}</td>
-                        <td class="px-6 py-4 text-right font-bold text-slate-800">${formatMoney(monthTotal)}</td>
-                        <td class="px-6 py-4 text-right font-bold text-indigo-600">${formatMoney(yearTotal)}</td>
-                        <td class="px-6 py-4 text-right text-slate-500 text-xs">${formatMoney(yearTotal/12)}</td>
-                    </tr>`;
-            });
-        }
-
-        function renderReportMatrix() {
-            const tbody = document.getElementById('reportMatrixBody'); 
-            tbody.innerHTML = '';
-            const allItems = [...expenseData].sort((a,b) => a.group.localeCompare(b.group));
-            
-            allItems.forEach(item => {
-                let rowHtml = `<td class="matrix-cell text-left font-medium text-slate-700 sticky left-0 bg-white border-r z-20"><div class="truncate max-w-[140px]" title="${item.name}">${item.name}</div><div class="text-[10px] text-slate-400">${item.group}</div></td>`;
-                let rowTotal = 0;
-                for(let m=0; m<12; m++) {
-                    const val = getTotalActual('expense', item.group, item.name, m); 
-                    rowTotal += val;
-                    const colorClass = val > 0 ? 'text-slate-700 font-medium' : 'text-slate-300';
-                    const bgClass = val > (item.budget[m]*1.2) && item.budget[m] > 0 ? 'bg-rose-50' : '';
-                    rowHtml += `<td class="matrix-cell ${colorClass} ${bgClass}">${val > 0 ? Math.round(val) : '-'}</td>`;
-                }
-                rowHtml += `<td class="matrix-cell font-bold text-indigo-700 bg-indigo-50 border-l">${formatMoney(rowTotal)}</td>`;
-                tbody.innerHTML += `<tr class="matrix-row">${rowHtml}</tr>`;
             });
         }
 
